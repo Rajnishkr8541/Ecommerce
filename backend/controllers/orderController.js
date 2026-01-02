@@ -105,24 +105,43 @@ exports.updateOrderStatus = async (req,res) =>{
     }
 };
 
-// CANCEL ORDER 
 exports.cancelOrder = async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.orderId).populate(items.product);
+  try {
+    const order = await Order.findById(req.params.orderId)
+      .populate("items.product");
 
-        if(!order){
-            return res.status(404).json({message: "Order not found"});
-        }
-
-        // Already shipped or delivered
-        if(["Shipped", "Delivered"].includes(order.status)){
-            return res.status(400).json({message: "Order cannoot be cancelled after shipping"});
-        }
-
-        //Stock rollback
-
-        
-    } catch (error) {
-        
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
-}
+
+    // ❌ Already shipped / delivered
+    if (["Shipped", "Delivered"].includes(order.status)) {
+      return res.status(400).json({
+        message: "Order cannot be cancelled after shipping"
+      });
+    }
+
+    // ✅ STOCK ROLLBACK
+    for (let item of order.items) {
+      const product = await Product.findById(item.product._id);
+
+      product.stock += item.quantity;
+      product.isOutOfStock = false;
+
+      await product.save();
+    }
+
+    // ✅ Cancel order
+    order.status = "Cancelled";
+    await order.save();
+
+    res.json({
+      message: "Order cancelled & stock restored successfully",
+      order
+    });
+
+  } catch (error) {
+    console.error("Cancel order error:", error);
+    res.status(500).json({ message: "Failed to cancel order" });
+  }
+};
