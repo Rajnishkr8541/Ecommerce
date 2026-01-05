@@ -3,22 +3,24 @@ exports.calculateCartTotals = (cartItems) => {
     let discount = 0;
 
     cartItems.forEach(item =>{
-        const product = item.product;
         const qty = item.quantity;
 
-        const itemTotal = product.price*qty;
-        subtotal +=itemTotal;
+        const price = item.priceAtAdd;
 
-        if(product.offer){
-        if(product.offer.discountPercent){
-            discount += (itemTotal * product.offer.discountPercent) / 100;
+        const itemTotal = price * qty;
+        subtotal += itemTotal;
+
+        //offer only if products ppopulated
+        if(item.product && item.product.offer){
+            const offer = item.product.offer;
+
+            if(offer.discountPercent){
+                discount += (itemTotal * offer.discountPercent) /100;
+            }
+            if(offer.flatDiscount){
+                discount += offer.flatDiscount * qty;
+            }
         }
-
-        if(product.offer.flatDiscount){
-            discount += product.offer.flatDiscount * qty;
-        }
-    }
-
     });
 
     const totalAmount = subtotal - discount;
