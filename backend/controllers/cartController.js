@@ -1,6 +1,7 @@
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const {calculateCartTotals} = require("../utils/calculateTotal")
+const Coupon = require("../models/Coupon")
 
 //  GET USER CART
 exports.getCart = async (req, res) => {
@@ -128,7 +129,7 @@ exports.updateCartItem = async (req,res) => {
 //Cart summary 
 exports.getCartSummary = async (req,res)=>{
   try {
-    const cart = await Cart.findOne({user: req.user._id});
+    const cart = await Cart.findOne({user: req.user._id}).populate("items.product");
 
     if(!cart || cart.items.length === 0){
       return res.json({
@@ -136,15 +137,26 @@ exports.getCartSummary = async (req,res)=>{
         subtotal: 0,
         discount: 0,
         deliveryCharge: 0,
-        totalAmount: 0,
         grandTotal: 0
       });
     } 
 
     const totals = calculateCartTotals(cart.items);
 
-    res.json({items: cart.items, ...totals});
+    const items = cart.items.map(item => ({
+      product: {
+        _id: item.product._id,
+        name: item.product.name,
+        price: item.product.price
+      },
+      quantity: item.quantity,
+      itemTotal: item.product.price * item.quantity
+    }));
 
+    res.json({
+      items,
+      ...totals
+    });
 
   } catch (error) {
     console.error("CART SUMMARY ERROR:", error.message);
@@ -152,3 +164,53 @@ exports.getCartSummary = async (req,res)=>{
     
   }
 }
+
+
+// Apply coupon to cart
+
+exports.applyCoupon = async (req, res) => {
+  try {
+    const {code} = req.body;
+
+    const coupon = await Coupon.findOne({
+      code : code.toUpperCase(),
+      isActive : true,
+      expiresAt : {$gte: new Date()}
+    });
+
+    if(!coupon){
+      return res.status(400).json({message: " Invalid or Expired coupon"});
+    }
+
+    const cart = await Cart.findOne({user: req.user._id}).populate("items.product");
+
+    if(!cart || cart.items.length === 0){
+      return res.status(400).json({message: "Cart is empty"})
+    }
+
+    //subtotal
+
+    let subtotal = 0;
+    cart.items.forEach(item =>{
+      subtotal += item.priceAtAdd* item.quantity; 
+    });
+
+    if (subtotal < coupon.minOrderAmount) {
+      return res.status(400).json({
+        message:`Minimum order ₹${coupon.minOrderAmount} required`
+      });
+    }
+
+    cart.coupon = coupon._id;
+    await cart.save();
+
+    //calculate total with coupon
+    const totals = calculateCartTotals(cart.items, coupon)
+
+    res.json({message: "Coupon applied successfully", coupon, totals});
+
+  }catch(error){
+    console.error("APPLY COUPON ERROR:", error);
+    res.status(500).json({message: "Failed to apply coupon"});
+  }
+};

@@ -1,4 +1,4 @@
-exports.calculateCartTotals = (cartItems) => {
+exports.calculateCartTotals = (cartItems, coupon = null) => {
     let subtotal = 0;
     let discount = 0;
 
@@ -23,7 +23,17 @@ exports.calculateCartTotals = (cartItems) => {
         }
     });
 
-    const totalAmount = subtotal - discount;
+    if(coupon){
+        if(coupon.discountPercent){
+            discount += (subtotal * coupon.discountPercent) /100; 
+        }
+        if(coupon.flatDiscount){
+            discount += coupon.flatDiscount;
+        }
+    }
+
+
+    const totalAmount = Math.max(0, subtotal - discount);
 
     // Delivery charges
 

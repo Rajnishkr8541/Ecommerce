@@ -20,24 +20,13 @@ const cartSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
-    items: [
-        {
-            product: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Product",
-                required: true
-            },
-            quantity: {
-                type: Number,
-                required: true,
-                min: 1
-            },
-            priceAtAdd:{
-                type: Number,
-                required: true
-            }
-        }
-    ]
+    items: [cartItemSchema],
+    coupon : {
+        type : mongoose.Schema.Types.ObjectId,
+        ref : "Coupon",
+        default: null
+    }
+    
 },
 {timestamps: true}
 );

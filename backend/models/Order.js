@@ -25,18 +25,9 @@ const orderSchema = new mongoose.Schema({
         }
     ],
 
-    subtotal:{ 
-        type:Number,
-        required: true
-    },
-    discount:{ 
-        type: Number,
-        default: 0
-    },
-    deliveryCharge:{
-        type: Number,
-        default: 55
-    },
+    subtotal: Number,
+    discount: Number,
+    deliveryCharge:Number,
     grandTotal: {
         type: Number,
         required: true

@@ -4,59 +4,68 @@ const Product = require("../models/Product");
 const {calculateCartTotals} = require("../utils/calculateTotal")
 
 exports.placeOrder = async (req, res) => {
-    try{
-        //User Cart
-        const cart = await Cart.findOne({user: req.user._id}).populate("items.product");
-        if(!cart || cart.items.length === 0){
-            return res.status(400).json({message: "Cart is empty"})
-        }
+  try {
+    const cart = await Cart.findOne({ user: req.user._id })
+      .populate("items.product");
 
-        //total calculation
-        const {subtotal, discount,totalAmount, deliveryCharge, grandTotal} = calculateCartTotals(cart.items);
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
 
-        //order items prepared
-        const orderItems = cart.items.map(item => ({
-            product: item.product._id,
-            quantity: item.quantity,
-            priceAtPurchase: item.product.price
-        }));
+    // Calculate totals
+    const {
+      subtotal,
+      discount,
+      totalAmount,
+      deliveryCharge,
+      grandTotal
+    } = calculateCartTotals(cart.items);
 
-        
-        //create order
-        const order = await Order.create({
-            user: req.user._id,
-            items: orderItems,
-            subtotal,
-            discount,
-            deliveryCharge,
-            grandTotal
-        });
+    // Prepare order items
+    const orderItems = cart.items.map(item => ({
+      product: item.product._id,
+      quantity: item.quantity,
+      priceAtPurchase: item.priceAtAdd,
+      deliveryCharge,
+      grandTotal
+    }));
 
-        // stock reduce
+    // Create order
+    const order = await Order.create({
+      user: req.user._id,
+      items: orderItems,
+      subtotal,
+      discount,
+      deliveryCharge,
+      grandTotal
+    });
 
-        for(let item of cart.items){
-            const product = await Product.findById(item.product._id);
+    // Reduce stock
+    for (const item of cart.items) {
+      const product = await Product.findById(item.product._id);
 
-            product.stock -= item.quantity;
+      product.stock -= item.quantity;
+      if (product.stock <= 0) {
+        product.stock = 0;
+        product.isOutOfStock = true;
+      }
 
-            if(product.stock <= 0){
-                product.stock = 0;
-                product.isOutOfStock = true;
-            }
+      await product.save();
+    }
 
-            await product.save();
-        }
+    // Clear cart
+    cart.items = [];
+    await cart.save();
 
-        //clear cart
-        cart.items = [];
-        await cart.save();
+    res.status(201).json({
+      message: "Order placed successfully",
+      order
+    });
 
-        //Response
-        res.status(201).json({message: "Order placed successfully", order});
-        }catch(error){
-            console.error("Error placing order:", error);
-            res.status(500).json({message: "Internal Server Error"});
-        }
+  } catch (error) {
+    console.error("PLACE ORDER ERROR:", error);
+    res.status(500).json({ message: "Failed to place order" });
+  }
 };
 
 // Users orders
@@ -145,3 +154,4 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ message: "Failed to cancel order" });
   }
 };
+
