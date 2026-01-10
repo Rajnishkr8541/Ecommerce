@@ -9,6 +9,5 @@ router.post("/place", protect, placeOrder);
 router.get("/my", protect, getMyOrders);
 router.get("/", protect, adminOnly, getAllOrders);
 router.patch("/:orderId/status", protect, adminOnly, updateOrderStatus);
-router.patch("/:orderId/cancel", protect, cancelOrder);
-
+router.patch("/cancel/:orderId", protect, cancelOrder);
 module.exports = router;
