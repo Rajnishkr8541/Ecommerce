@@ -129,7 +129,7 @@ exports.updateCartItem = async (req,res) => {
 //Cart summary 
 exports.getCartSummary = async (req,res)=>{
   try {
-    const cart = await Cart.findOne({user: req.user._id}).populate("items.product");
+    const cart = await Cart.findOne({user: req.user._id}).populate("items.product").populate("coupon");
 
     if(!cart || cart.items.length === 0){
       return res.json({
@@ -141,20 +141,25 @@ exports.getCartSummary = async (req,res)=>{
       });
     } 
 
-    const totals = calculateCartTotals(cart.items);
+    const totals = calculateCartTotals(cart.items, cart.coupon);
 
     const items = cart.items.map(item => ({
       product: {
         _id: item.product._id,
         name: item.product.name,
-        price: item.product.price
+        price: item.priceAtAdd
       },
       quantity: item.quantity,
-      itemTotal: item.product.price * item.quantity
+      itemTotal: item.priceAtAdd* item.quantity
     }));
 
     res.json({
       items,
+      coupon:cart.coupon?{
+        code: cart.coupon.code,
+        discountPercent: cart.coupon.discountPercent,
+        flatDiscount: cart.coupon.flatDiscount
+      }: null,
       ...totals
     });
 

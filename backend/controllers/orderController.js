@@ -2,6 +2,7 @@ const Cart = require("../models/Cart");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const { calculateCartTotals } = require("../utils/calculateTotal");
+const Address = require("../models/Address")
 
 exports.placeOrder = async (req, res) => {
   try {
@@ -41,8 +42,29 @@ exports.placeOrder = async (req, res) => {
       grandTotal,
       coupon: cart.coupon ? cart.coupon._id : null,
       couponCode: cart.coupon ? cart.coupon.code : null,
-      couponDiscount
+      couponDiscount,
+      shippingAddress:{
+        name: address.name,
+        phone: address.phone,
+        addressLine: address.addressLine,
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        country: address.country
+      },
+      paymentMethod: "COD",
+      paymentStatus: "Pending"
     });
+
+    //Address
+    const address = await Address.findOne({
+      user: req.user._id,
+      isDefault: true
+    });
+
+    if(!address){
+      return res.status(400).json({message: "Please add delivery address"});
+    }
 
     // Reduce stock
     for (const item of cart.items) {
@@ -58,9 +80,11 @@ exports.placeOrder = async (req, res) => {
     }
 
     // Clear cart
-    cart.items = [];
+    if(order){
+      cart.items = [];
     cart.coupon = null;
     await cart.save();
+    }
 
     res.status(201).json({
       message: "Order placed successfully",
@@ -79,17 +103,23 @@ exports.getMyOrders = async (req, res) => {
       .populate("items.product", "name price")
       .sort({ createdAt: -1 });
 
-    const formattedOrders = orders.map(order => ({
+    const formattedOrders = orders.map((order) => ({
       orderId: order._id,
       status: order.status,
+      timeline:[
+        {step: "Pending", done: true},
+        {step: "Confirmed", done:["Confirmed", "Shipped", "Delivered" ].includes(order.status)},
+        {step: "Shipped", done:["Shipped", "Delivered"].includes(order.status)},
+        {step: "Delivered", done:order.status === "Delivered"}
+      ],
       orderDate: order.createdAt,
 
-      items: order.items.map(item => ({
+      items: order.items.map((item) => ({
         productId: item.product?._id,
         name: item.product?.name,
         price: item.priceAtPurchase,
         quantity: item.quantity,
-        itemTotal: item.priceAtPurchase * item.quantity
+        itemTotal: item.priceAtPurchase * item.quantity,
       })),
 
       priceSummary: {
@@ -98,15 +128,14 @@ exports.getMyOrders = async (req, res) => {
         couponCode: order.couponCode || null,
         couponDiscount: order.couponDiscount || 0,
         deliveryCharge: order.deliveryCharge,
-        grandTotal: order.grandTotal
-      }
+        grandTotal: order.grandTotal,
+      },
     }));
 
     res.json({
       totalOrders: formattedOrders.length,
-      orders: formattedOrders
+      orders: formattedOrders,
     });
-
   } catch (error) {
     console.error("Get my orders error:", error);
     res.status(500).json({ message: "Failed to fetch orders" });
@@ -151,32 +180,29 @@ exports.updateOrderStatus = async (req, res) => {
 //CANCEL ORDERS by user
 exports.cancelOrder = async (req, res) => {
   try {
+    const { orderId } = req.params;
 
-    const {orderId} = req.params; 
-
-    const order = await Order.findById(orderId).populate(
-      "items.product"
-    );
+    const order = await Order.findById(orderId).populate("items.product");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
     //user permission check
-    if(order.user.toString() !== req.user._id.toString()){
+    if (order.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({
-        message: "You are not allowed to cancel this order"
+        message: "You are not allowed to cancel this order",
       });
     }
 
     //Stock Rollback
-    for(const item of order.items){
+    for (const item of order.items) {
       const product = await Product.findById(item.product._id);
 
-      if(product){
+      if (product) {
         product.stock += item.quantity;
         product.isOutOfStock = false;
-        await product.save()
+        await product.save();
       }
     }
 
@@ -187,12 +213,61 @@ exports.cancelOrder = async (req, res) => {
     res.json({
       message: "Order Cancelled Successfully",
       orderId: order._id,
-      status: order.status
-    })
-
-    
+      status: order.status,
+    });
   } catch (error) {
     console.error("Cancel order error:", error);
     res.status(500).json({ message: "Failed to cancel order" });
+  }
+};
+
+//USER SINGLE ORDER DETAILS
+exports.getOrderDetails = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId)
+      .populate("items.product", "name images")
+      .populate("coupon");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    //only user see this order like onwer of this account
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: "You are not authorized to view this order",
+      });
+    }
+
+    const items = order.items.map((item) => ({
+      productId: item.product?._id,
+      name: item.product?.name,
+      image: item.product?.image?.[0] || null,
+      priceAtPurchase: item.priceAtPurchase,
+      quantity: item.quantity,
+      itemTotal: item.priceAtPurchase * item.quantity,
+    }));
+
+    res.json({
+      orderId: order._id,
+      status: order.status,
+      orderDate: order.createdAt,
+
+      items,
+
+      priceSummary:{
+        subtotal: order.subtotal,
+        discount: order.discount,
+        couponCode: order.couponCode || null,
+        couponDiscount: order.couponDiscount || 0,
+        deliveryCharge: order.deliveryCharge,
+        grandTotal: order.grandTotal
+      }
+    });
+  } catch (error) {
+    console.error("GET ORDER DETAILS ERROR:", error);
+    res.status(500).json({message: "Failed to fetch order details"})
   }
 };
