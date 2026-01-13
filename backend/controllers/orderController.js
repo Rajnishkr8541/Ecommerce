@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Cart = require("../models/Cart");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
@@ -12,6 +13,16 @@ exports.placeOrder = async (req, res) => {
 
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    // Get default address
+    const address = await Address.findOne({
+      user: req.user._id,
+      isDefault: true
+    })
+
+    if(!address){
+      return res.status(400).json({message: "Please add delivery address"});
     }
 
     // Calculate totals
@@ -43,28 +54,19 @@ exports.placeOrder = async (req, res) => {
       coupon: cart.coupon ? cart.coupon._id : null,
       couponCode: cart.coupon ? cart.coupon.code : null,
       couponDiscount,
+      address: address._id,
       shippingAddress:{
         name: address.name,
         phone: address.phone,
         addressLine: address.addressLine,
         city: address.city,
         state: address.state,
-        pincode: address.pincode,
-        country: address.country
+        pincode: address.pincode
       },
       paymentMethod: "COD",
       paymentStatus: "Pending"
     });
-
-    //Address
-    const address = await Address.findOne({
-      user: req.user._id,
-      isDefault: true
-    });
-
-    if(!address){
-      return res.status(400).json({message: "Please add delivery address"});
-    }
+    
 
     // Reduce stock
     for (const item of cart.items) {
@@ -226,9 +228,13 @@ exports.getOrderDetails = async (req, res) => {
   try {
     const { orderId } = req.params;
 
+    if(!mongoose.Types.ObjectId.isValid(orderId)){
+        return res.status(400).json({message:"Invalid order ID"});
+    }
+
     const order = await Order.findById(orderId)
       .populate("items.product", "name images")
-      .populate("coupon");
+      .populate("coupon").populate("address");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -254,9 +260,8 @@ exports.getOrderDetails = async (req, res) => {
       orderId: order._id,
       status: order.status,
       orderDate: order.createdAt,
-
-      items,
-
+      shippingAddress: order.shippingAddress, 
+      items,  
       priceSummary:{
         subtotal: order.subtotal,
         discount: order.discount,

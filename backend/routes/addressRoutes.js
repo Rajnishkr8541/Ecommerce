@@ -10,7 +10,7 @@ const{
 } = require("../controllers/addressController")
 
 router.post("/add", protect, addAddress);
-router.get("/", protect, getMyAddresses);
-router.patch("/:id/default", protect, setDefaultAddress);
+router.get("/my", protect, getMyAddresses);
+router.patch("/set-default/:id", protect, setDefaultAddress);
 
 module.exports = router;

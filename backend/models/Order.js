@@ -55,6 +55,11 @@ const orderSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    address: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Address",
+        requires: true
+    },
     status:{
         type: String,
         enum: ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"],
@@ -67,7 +72,6 @@ const orderSchema = new mongoose.Schema({
         city: String,
         State: String,
         pincode: String,
-        country: String
     },
     paymentMethod: {
         type: String,

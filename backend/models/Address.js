@@ -7,16 +7,30 @@ const addressSchema = new mongoose.Schema({
         required: true
     },
 
-    name: String,
-    phone: String,
-
-    addressLine: String,
-    city: String,
-    state: String,
-    pincode: String,
-    country:{
+    name: {
         type: String,
-        default: "India"
+        required: true
+    },
+    phone: {
+        type: String,
+        required: true
+    },
+
+    addressLine: {
+        type: String,
+        required: true
+    },
+    city: {
+        type:String,
+        required: true
+    },
+    state: {
+        type: String,
+        required: true
+    },
+    pincode: {
+        type:String,
+        required: true
     },
     isDefault:{
         type: Boolean,

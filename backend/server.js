@@ -5,7 +5,8 @@ const config = require("./config");
 const cartRoutes = require("./routes/cartRoutes");
 const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
-const orderRoutes = require("./routes/orderRoutes")
+const orderRoutes = require("./routes/orderRoutes");
+const addressRoutes = require("./routes/addressRoutes");
 
 const app = express();
 
@@ -24,7 +25,8 @@ app.use("/api/auth", authRoutes);
 console.log("Product routes loaded");
 app.use("/api/products", productRoutes);
 //Order Routes
-app.use("/api/orders", orderRoutes)
+app.use("/api/orders", orderRoutes);
+app.use("/api/address", addressRoutes);
 
 //Test route
 app.get("/", (req, res) => {

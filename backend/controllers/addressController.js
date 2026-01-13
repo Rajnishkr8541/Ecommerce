@@ -1,34 +1,61 @@
 const Address = require("../models/Address");
 
 exports.addAddress = async (req,res)=>{
-    const address = await Address.create({
-        ...req.body,
-        user: req.user._id
-    });
+    try{
+        const {name, phone, addressLine, city, state, pincode} = req.body;
 
-    //Default Address
-    const count = await Address.countDocuments({user: req.user._id});
-    if(count === 1){
-        address.isDefault = true;
-        await address.save();
+        // first address = default
+        const existing = await Address.find({user:req.user._id});
+        const isDefault = existing.length === 0;
+
+        const address = await Address.create({
+            user: req.user._id,
+            name,
+            phone,
+            addressLine,
+            city,
+            state,
+            pincode,
+            isDefault
+        });
+
+        res.status(201).json({
+            message: "Address added successfully",
+            address
+        });
+        
+    }catch(error){
+        console.error("ADD ADDRESS ERROR: ", error);
+        res.status(500).json({message: "Failed to add address"})
     }
-    res.json(address);
 };
 
-exports.getMyAddresses() = async(req, res) => {
-    const addresses = await Address.find({user: req.user._id}).sort({isDefault: -1, createdAt: -1});
-
-    res.json(addresses);
+//Get user address
+exports.getMyAddresses = async(req,res) => {
+    try {
+        const addresses = await Address.find({user: req.user._id}).sort({isDefault: -1});
+        res.json(addresses);
+    } catch (error) {
+        res.status(500).json({message: "Failed to fetch addresses"});
+    }
 };
 
-exports.setDefaultAddress = async(req,res) => {
-    await Address.updateMany(
-        {user: req.user._id},
-        {isDefault: false}
-    );
+// SET default address
+exports.setDefaultAddress = async(req, res) => {
+    try {
+        const addressId = req.params.id;
 
-    await Address.findByIdAndUpdate(req.params.id, {isDefault: true});
+        await Address.updateMany(
+            {user: req.user._id},
+            {isDefault: false}
+        );
 
-    res.json({message: "Default address updated"})
-}
+       const address = await Address.findOneAndUpdate({_id:addressId, user: req.user._id}, {isDefault: true}, {new:true});
+
+        res.json({message: "Default address updated",address})
+
+    } catch (error) {
+        res.status(500).json({message: "Failed to add default address"})
+    }
+};
 
