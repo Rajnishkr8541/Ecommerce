@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/*Smooth Fonts*/
+body{
+  @apply bg-zinc-950 text-white antialiased;
+}
